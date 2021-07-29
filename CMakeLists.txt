@@ -31,7 +31,7 @@ cmake_minimum_required(VERSION 2.8.12)
 project(sicup)
 enable_language(CXX)
 
-set(EXECUTABLE_NAME "simple_channel")
+set(EXECUTABLE_NAME "palNFC")
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ".")
 
 if(NOT CMAKE_BUILD_TYPE)
