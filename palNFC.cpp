@@ -192,6 +192,7 @@ int main(int argc, char* argv[])
     
     SimulationParameters param;
     readInputParameters(xmlInputFileName, param);
+    calculateDerivedSimulationParameters(param);
 
 
     return 0;
