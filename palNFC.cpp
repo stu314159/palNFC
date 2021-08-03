@@ -35,6 +35,19 @@ struct SimulationParameters
     T rho;
     T nu;
     T cSmago; 
+    
+    // parameters not set by the user
+    T lx, ly, lz;
+    plint nx, ny, nz;
+    T rho_LB;
+    T ambientPressure_LB;
+    Array<T,3> inletVelocity_LB;
+    
+    
+    Box3D inlet, outlet;
+    Box3D lateral1, lateral2;
+    Box3D lateral3, lateral4;
+    
 };
 
 void readInputParameters(std::string xmlInputFileName, SimulationParameters& param)
@@ -78,6 +91,42 @@ void readInputParameters(std::string xmlInputFileName, SimulationParameters& par
     document["output"]["outIter"].read(param.outIter);
     document["output"]["cpIter"].read(param.cpIter);    
     
+}
+
+void defineOuterDomain(SimulationParameters& param)
+{
+    if (param.flowDirection == 0)  // flow in positive x-direction
+    {
+        param.inlet = Box3D(0,0,0,param.ny-1,0,param.nz-1);
+        param.outlet = Box3D(param.nx - 1, param.nx-1, 0, param.ny-1,0,param.nz-1);
+        param.lateral1 = Box3D(1,param.nx-2,0,0,0,param.nz-1); // "bottom"
+        param.lateral2 = Box3D(1,param.nx-2,param.ny-1,param.ny-1,0,param.nz-1); // "top"
+        param.lateral3 = Box3D(1,param.nx-2,1,param.ny-2,0,0); //"left"
+        param.lateral4 = Box3D(1,param.nx-2,1,param.ny-2,param.nz-1,param.nz-1); // "right"    
+    } else if (param.flowDirection == 1) // flow in positive y-direction
+    {
+        param.inlet = Box3D(0,param.nx-1,0,0,0,param.nz-1);
+        param.outlet = Box3D(0,param.nx-1,param.ny-1,param.ny-1,0,param.nz-1);
+        param.lateral1 = Box3D(0,param.nx-1,1,param.ny-2,0,0);
+        param.lateral2 = Box3D(0,param.nx-1,1,param.ny-2,param.nz-1,param.nz-1);
+        param.lateral3 = Box3D(0,0,1,param.ny-2,1,param.nz-2);
+        param.lateral4 = Box3D(param.nx-1,param.nx-1,1,param.ny-2,1,param.nz-2);    
+    } else // flow in positive z-direction
+    {
+        param.inlet = Box3D(0,param.nx-1,0,param.ny-1,0,0);
+        param.outlet = Box3D(0,param.nx-1,0,param.ny-1,param.nz-1,param.nz-1);
+        param.lateral1 = Box3D(0,0,0,param.ny-1,1,param.nz-2);
+        param.lateral2 = Box3D(param.nx-1,param.nx-1,0,param.ny-1,1,param.nz-2);
+        param.lateral3 = Box3D(1,param.nx-2,0,0,1,param.nz-2);
+        param.lateral4 = Box3D(1,param.nx-2,param.ny-1,param.ny-1,1,param.nz-2);    
+    }
+
+}
+
+void calculateDerivedSimulationParameters(SimulationParameters& param)
+{
+
+    defineOuterDomain(param);
 }
 
 int main(int argc, char* argv[])
