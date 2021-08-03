@@ -34,13 +34,17 @@ struct SimulationParameters
     
     T rho;
     T nu;
+    T ambientPressure;
     T cSmago; 
     
     // parameters not set by the user
     T lx, ly, lz;
+    T dx;
+    T omega;
     plint nx, ny, nz;
     T rho_LB;
     T ambientPressure_LB;
+    Array<T,3> inletVelocity;
     Array<T,3> inletVelocity_LB;
     
     
@@ -87,6 +91,8 @@ void readInputParameters(std::string xmlInputFileName, SimulationParameters& par
     document["fluid"]["rho"].read(param.rho);
     PLB_ASSERT(param.rho > 0);
     
+    document["fluid"]["ambientPressure"].read(param.ambientPressure);
+    
     document["output"]["statIter"].read(param.statIter);
     document["output"]["outIter"].read(param.outIter);
     document["output"]["cpIter"].read(param.cpIter);    
@@ -125,7 +131,40 @@ void defineOuterDomain(SimulationParameters& param)
 
 void calculateDerivedSimulationParameters(SimulationParameters& param)
 {
-
+    param.lx = param.xDomain[1] - param.xDomain[0];
+    param.ly = param.yDomain[1] - param.yDomain[0];
+    param.lz = param.zDomain[1] - param.zDomain[0];
+    
+    param.dx = param.characteristicLength / (param.resolution - 1.0);
+    
+    param.nx = util::roundToInt(param.lx/param.dx) + 1;
+    param.ny = util::roundToInt(param.ly/param.dx) + 1;
+    param.nz = util::roundToInt(param.lz/param.dx) + 1;
+    
+    param.rho_LB = 1.0;
+    param.ambientPressure_LB = (1.0/param.rho)*(param.dt*param.dt/(param.dx*param.dx))*param.ambientPressure;
+    
+    T velMag = param.Re*param.nu/param.characteristicLength;
+    if (param.flowDirection == 0)
+    {
+        param.inletVelocity[0]=velMag;
+        param.inletVelocity[1]=0.; param.inletVelocity[2]=0.;
+    } else if (param.flowDirection == 1)
+    {
+        param.inletVelocity[0] = 0; param.inletVelocity[2]=0;
+        param.inletVelocity[1] = velMag;
+    } else
+    {
+        param.inletVelocity[2] = velMag;
+        param.inletVelocity[0] = 0; param.inletVelocity[1] = 0;
+    }
+    
+    
+    param.inletVelocity_LB = param.inletVelocity*(param.dt/param.dx);
+    
+    T nu_LB = param.nu * param.dt / (param.dx * param.dx);
+    param.omega = 1.0 / (DESCRIPTOR<T>::invCs2 * nu_LB + 0.5);
+    
     defineOuterDomain(param);
 }
 

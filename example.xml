@@ -2,7 +2,7 @@
 <geometry>
   <simulationDomain>
     <!-- max and min of xyz coordinates for rectangular global domain -->
-    <x> 0.0     7.0     </x>
+    <x> 0.0     5.0     </x>
     <y>  0.0     5.0  </y>
     <z>   0.0     10.0  </z>
   </simulationDomain>
@@ -24,6 +24,7 @@
 <fluid>
   <nu> 2.5e-5</nu>
   <rho> 1000.0 </rho>
+  <ambientPressure> 0.0 </ambientPressure>
 </fluid>
 
 <output>
