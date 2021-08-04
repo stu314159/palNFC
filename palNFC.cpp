@@ -93,6 +93,8 @@ struct SimulationParameters
     Box3D lateral1, lateral2;
     Box3D lateral3, lateral4;
     
+    plint smallEnvelopeWidth; // standard width
+    
 };
 
 void readInputParameters(std::string xmlInputFileName, SimulationParameters& param)
@@ -216,12 +218,35 @@ void calculateDerivedSimulationParameters(SimulationParameters& param)
     param.omega = 1.0 / (DESCRIPTOR<T>::invCs2 * nu_LB + 0.5);
     
     defineOuterDomain(param);
+    
+    param.smallEnvelopeWidth = 1; 
 }
+
+void createFluidBlocks(SimulationParameters& param, MultiBlockLattice3D<T,DESCRIPTOR>*& lattice)
+{
+    Dynamics<T,DESCRIPTOR> *dynamics = new SmagorinskyBGKdynamics<T,DESCRIPTOR>(param.omega, param.cSmago);
+    
+    pcout << "Dynamics: Smagorinsky BGK. " << std::endl;
+    
+    Box3D fullDomain(0,param.nx-1,0,param.ny-1,0,param.nz-1);
+    lattice = generateMultiBlockLattice<T,DESCRIPTOR>(fullDomain,dynamics->clone(),param.smallEnvelopeWidth).release();
+    
+    defineDynamics(*lattice, lattice->getBoundingBox(),dynamics->clone());
+    delete dynamics;
+
+
+
+}
+
+
 
 int main(int argc, char* argv[])
 {
     plbInit(&argc, &argv);
     global::directories().setOutputDir(outdir);
+    
+    plint numCores = global::mpi().getSize();
+    pcout << "Number of MPI processes: " << numCores << std::endl;
     
     if (argc != 2 && argc != 3) 
     {
@@ -243,7 +268,16 @@ int main(int argc, char* argv[])
     SimulationParameters param;
     readInputParameters(xmlInputFileName, param);
     calculateDerivedSimulationParameters(param);
-
-
+    
+    pcout << "omega = " << param.omega << std::endl;
+    plint nnodes = param.nx*param.ny*param.nz;
+    pcout << "Number of lattice points: " << nnodes << std::endl;
+    
+    MultiBlockLattice3D<T,DESCRIPTOR> *lattice = 0;
+    
+    createFluidBlocks(param, lattice);
+    
+    delete lattice;
+    
     return 0;
 }
