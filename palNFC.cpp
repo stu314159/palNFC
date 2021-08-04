@@ -37,6 +37,9 @@ struct SimulationParameters
     // time step size.
     T dt;
     
+    //number of initial iterations for smoothly increasing the inlet velocity
+    plint startIter;
+    
     // total iterations
     plint maxIter;
     
@@ -90,12 +93,19 @@ struct SimulationParameters
     // Palabos data structures to represent sets of lattice points 
     // on the boundaries.
     Box3D inlet, outlet;
-    Box3D lateral1, lateral2;
-    Box3D lateral3, lateral4;
+    Box3D lateral1;
+    Box3D lateral2;
+    Box3D lateral3;
+    Box3D lateral4;
     
     plint smallEnvelopeWidth; // standard width
     
 };
+
+Array<T,3> getVelocity(Array<T,3> targetValue, plint iIter, plint startIter)
+{
+    return (targetValue * util::sinIncreasingFunction<T>(iIter,startIter));
+}
 
 void readInputParameters(std::string xmlInputFileName, SimulationParameters& param)
 {
@@ -123,6 +133,8 @@ void readInputParameters(std::string xmlInputFileName, SimulationParameters& par
     
     document["numerics"]["dt"].read(param.dt);
     PLB_ASSERT(param.dt > 0);
+    
+    document["numerics"]["startIter"].read(param.startIter);
     
     document["numerics"]["maxIter"].read(param.maxIter);
     PLB_ASSERT(param.maxIter > 0);
@@ -233,9 +245,49 @@ void createFluidBlocks(SimulationParameters& param, MultiBlockLattice3D<T,DESCRI
     
     defineDynamics(*lattice, lattice->getBoundingBox(),dynamics->clone());
     delete dynamics;
+    lattice->toggleInternalStatistics(false);
 
 
 
+}
+
+void outerDomainBoundaryConditions(SimulationParameters const& param, MultiBlockLattice3D<T,DESCRIPTOR> *lattice, OnLatticeBoundaryCondition3D<T,DESCRIPTOR> *bc)
+{
+
+    Array<T,3> velocity = getVelocity(param.inletVelocity_LB,0,param.startIter);
+    
+    pcout << "No-slip lateral boundaries. " << std::endl; //uh...I want *no-slip*
+    lattice->periodicity().toggleAll(false);
+    
+    bc->setVelocityConditionOnBlockBoundaries(*lattice,param.inlet,boundary::dirichlet);
+    setBoundaryVelocity(*lattice,param.inlet,velocity);
+    
+    bc->setVelocityConditionOnBlockBoundaries(*lattice,param.lateral1,boundary::dirichlet);
+    bc->setVelocityConditionOnBlockBoundaries(*lattice,param.lateral2,boundary::dirichlet);
+    bc->setVelocityConditionOnBlockBoundaries(*lattice,param.lateral3,boundary::dirichlet);
+    bc->setVelocityConditionOnBlockBoundaries(*lattice,param.lateral4,boundary::dirichlet);
+   
+    
+    Array<T,3> zeroVel(0.0,0.0,0.0);
+    setBoundaryVelocity(*lattice,param.lateral1,zeroVel);
+    setBoundaryVelocity(*lattice,param.lateral2,zeroVel);
+    setBoundaryVelocity(*lattice,param.lateral3,zeroVel);
+    setBoundaryVelocity(*lattice,param.lateral4,zeroVel);
+   
+    
+    // outlet boundary
+    if (param.flowDirection == 0)
+    {
+        bc->addPressureBoundary0P(param.outlet,*lattice);
+    } else if (param.flowDirection == 1)
+    {
+        bc->addPressureBoundary1P(param.outlet,*lattice);
+    } else 
+    {
+        bc->addPressureBoundary2P(param.outlet,*lattice);
+    }
+    setBoundaryDensity(*lattice,param.outlet,param.rho_LB);
+    setBoundaryVelocity(*lattice,param.outlet,velocity);
 }
 
 
@@ -273,9 +325,15 @@ int main(int argc, char* argv[])
     plint nnodes = param.nx*param.ny*param.nz;
     pcout << "Number of lattice points: " << nnodes << std::endl;
     
-    MultiBlockLattice3D<T,DESCRIPTOR> *lattice = 0;
-    
+    MultiBlockLattice3D<T,DESCRIPTOR> *lattice = 0;    
     createFluidBlocks(param, lattice);
+    
+    // Boundary Conditions
+    pcout << "Applying boundary conditions..." << std::endl;
+    OnLatticeBoundaryCondition3D<T,DESCRIPTOR> *bc = createLocalBoundaryCondition3D<T,DESCRIPTOR>();
+    outerDomainBoundaryConditions(param,lattice,bc);
+    delete bc;
+    
     
     delete lattice;
     
