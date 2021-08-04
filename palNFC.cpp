@@ -15,39 +15,80 @@ std::string outdir(" ");
 
 struct SimulationParameters
 {
+    // 2D vectors storing min/max for each dimension of Cartesian coordinate system.
     std::vector<T> xDomain;
     std::vector<T> yDomain;
     std::vector<T> zDomain;
     
+    // [file name].STL with the STL-formatted description of an obstruction
     std::vector<std::string> obstFileName;
     
+    // 0 = x+, 1 = y+, 2 = z+  This is a feature that NFC does not have
     int flowDirection;
+    
+    // Reynolds number of the flow and characteristic length.  
+    // combined with fluid properties a representative average flow velocity is determined.
     T Re;
     T characteristicLength;
+    
+    // for NFC this is N_divs.  How many lattice points along the characteristic dimension
     plint resolution;
+    
+    // time step size.
     T dt;
     
+    // total iterations
     plint maxIter;
+    
+    // iterations between consol output of simulation statistics
     plint statIter;
+    
+    // iterations between data output (*.vti files)
     plint outIter;
+    
+    // iterations between creation of "check-point" files
     plint cpIter;
     
+    
+    // fluid density and kinematic viscosity
     T rho;
     T nu;
+    
+    // fluid ambient pressure (customarily zero)
     T ambientPressure;
+    
+    // Smagorinski constant for turbulent flow model
     T cSmago; 
     
     // parameters not set by the user
+    
+    // geometric length in x-, y-, and z-directions
     T lx, ly, lz;
-    T dx;
+    
+    // distance between lattice points (uniform in all directions)
+    T dx; 
+    
+    // relaxation constant
     T omega;
+    
+    // number of lattice points in x-, y-, and z-direction
     plint nx, ny, nz;
+    
+    // non-dimensional density (customarily equal to 1)
     T rho_LB;
+    
+    // non-dimensionalized ambient pressure (customarily 0)
     T ambientPressure_LB;
+    
+    // inlet velocity vector in physical units.
+    // note NFC would only allow velocity in the z-direction
     Array<T,3> inletVelocity;
+    
+    // inlet velocity in LBM units
     Array<T,3> inletVelocity_LB;
     
-    
+    // Palabos data structures to represent sets of lattice points 
+    // on the boundaries.
     Box3D inlet, outlet;
     Box3D lateral1, lateral2;
     Box3D lateral3, lateral4;
@@ -56,6 +97,8 @@ struct SimulationParameters
 
 void readInputParameters(std::string xmlInputFileName, SimulationParameters& param)
 {
+    // use the XMLreader object to collect SimulationParameters from
+    // the designated input file.
     XMLreader document(xmlInputFileName);
     document["geometry"]["simulationDomain"]["x"].read(param.xDomain);
     PLB_ASSERT(param.xDomain.size() == 2 && param.xDomain[1] > param.xDomain[0]); 
@@ -131,17 +174,24 @@ void defineOuterDomain(SimulationParameters& param)
 
 void calculateDerivedSimulationParameters(SimulationParameters& param)
 {
+    // simple measure of the extent of the domain in each direction
     param.lx = param.xDomain[1] - param.xDomain[0];
     param.ly = param.yDomain[1] - param.yDomain[0];
     param.lz = param.zDomain[1] - param.zDomain[0];
     
+    // recall: param.resolution is the number of lattice points along the
+    // characteristicLength --> there are (param.resolution - 1) "gaps"
     param.dx = param.characteristicLength / (param.resolution - 1.0);
     
+    // set up number of lattice points in each direction
     param.nx = util::roundToInt(param.lx/param.dx) + 1;
     param.ny = util::roundToInt(param.ly/param.dx) + 1;
     param.nz = util::roundToInt(param.lz/param.dx) + 1;
     
+    // customary to set rho_LB to 1.0
     param.rho_LB = 1.0;
+    
+    // ambient pressure scaled to LB units.
     param.ambientPressure_LB = (1.0/param.rho)*(param.dt*param.dt/(param.dx*param.dx))*param.ambientPressure;
     
     T velMag = param.Re*param.nu/param.characteristicLength;
