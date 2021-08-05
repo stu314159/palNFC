@@ -1,5 +1,7 @@
 #include "palabos3D.h"
 #include "palabos3D.hh"
+//#include "palabos2D.h"
+//#include "palabos2D.hh"
 
 #include <cstdlib>
 #include <cmath>
@@ -259,9 +261,12 @@ void outerDomainBoundaryConditions(SimulationParameters const& param, MultiBlock
     pcout << "No-slip lateral boundaries. " << std::endl; //uh...I want *no-slip*
     lattice->periodicity().toggleAll(false);
     
+    
+    // specified velocity on the inlet
     bc->setVelocityConditionOnBlockBoundaries(*lattice,param.inlet,boundary::dirichlet);
     setBoundaryVelocity(*lattice,param.inlet,velocity);
     
+    // no-slip walls
     bc->setVelocityConditionOnBlockBoundaries(*lattice,param.lateral1,boundary::dirichlet);
     bc->setVelocityConditionOnBlockBoundaries(*lattice,param.lateral2,boundary::dirichlet);
     bc->setVelocityConditionOnBlockBoundaries(*lattice,param.lateral3,boundary::dirichlet);
@@ -290,7 +295,16 @@ void outerDomainBoundaryConditions(SimulationParameters const& param, MultiBlock
     setBoundaryVelocity(*lattice,param.outlet,velocity);
 }
 
-
+template<class BlockLatticeT>
+void writeVTK(BlockLatticeT& lattice, SimulationParameters const& param, plint iter)
+{
+    T dx = param.dx;
+    T dt = param.dt;
+    ParallelVtkImageOutput3D<T> vtkOut(createFileName("vtk",iter,1),3,dx);
+    vtkOut.writeData<3,float>(*computeVelocity(lattice),"velocity",dx/dt);
+    vtkOut.writeData<float>(*computeVelocityNorm(lattice),"velocityNorm",dx/dt);
+    vtkOut.writeData<3,float>(*computeVorticity(*computeVelocity(lattice)),"vorticity",1./dt);
+}
 
 int main(int argc, char* argv[])
 {
@@ -317,6 +331,7 @@ int main(int argc, char* argv[])
         continueSimulation = true;
     }
     
+    // read input parameters and compute derived parameters
     SimulationParameters param;
     readInputParameters(xmlInputFileName, param);
     calculateDerivedSimulationParameters(param);
@@ -325,6 +340,7 @@ int main(int argc, char* argv[])
     plint nnodes = param.nx*param.ny*param.nz;
     pcout << "Number of lattice points: " << nnodes << std::endl;
     
+    // create the lattice
     MultiBlockLattice3D<T,DESCRIPTOR> *lattice = 0;    
     createFluidBlocks(param, lattice);
     
@@ -334,6 +350,25 @@ int main(int argc, char* argv[])
     outerDomainBoundaryConditions(param,lattice,bc);
     delete bc;
     
+    // incorporate the voxelized obstruction
+    
+    
+    // initialize the lattice
+    
+    // cary out time stepping with periodic data output
+    uint vtkNum = 0;
+    
+    for( plint iT=0; iT<param.maxIter; ++iT)
+    {
+        if(iT%param.outIter == 0 && iT>0)
+        {
+            pcout << "step " << iT << std::endl;
+            writeVTK(*lattice,param,vtkNum); vtkNum++;
+        }
+        // execute a time iteration
+        //lattice->collideAndStream();
+        
+    }
     
     delete lattice;
     
