@@ -23,7 +23,8 @@ struct SimulationParameters
     std::vector<T> zDomain;
     
     // [file name].STL with the STL-formatted description of an obstruction
-    std::vector<std::string> obstFileName;
+    //std::vector<std::string> obstFileName;
+    std::string obstFileName;
     
     // 0 = x+, 1 = y+, 2 = z+  This is a feature that NFC does not have
     int flowDirection;
@@ -351,6 +352,21 @@ int main(int argc, char* argv[])
     delete bc;
     
     // incorporate the voxelized obstruction
+    pcout << std::endl << "reading STL data for the obstacle geometry." << std::endl;
+    TriangleSet<T> triangleSet(param.obstFileName,DBL);
+    
+    plint xDirection = 0;
+    plint borderWidth = 1;
+    plint margin = 1;
+    plint blockSize = 0;
+    DEFscaledMesh<T> defMesh(triangleSet,0,xDirection,margin,Dot3D(0,0,0));
+    TriangleBoundary3D<T> boundary(defMesh);
+    pcout << std::endl << "Voxelizing the domain. " << std::endl;
+    plint extendedEnvelopeWidth = 2;
+    const int flowType = voxelFlag::outside;
+    VoxelizedDomain3D<T> voxelizedDomain(
+        boundary, flowType,lattice->getBoundingBox(),borderWidth,extendedEnvelopeWidth,blockSize);
+    pcout << getMultiBlockInfo(voxelizedDomain.getVoxelMatrix()) << std::endl;
     
     
     // initialize the lattice
