@@ -304,7 +304,7 @@ void outerDomainBoundaryConditions(SimulationParameters const& param,
         bc->addPressureBoundary2P(param.outlet,*lattice);
     }
     setBoundaryDensity(*lattice,param.outlet,param.rho_LB);
-    //setBoundaryVelocity(*lattice,param.outlet,velocity);
+    setBoundaryVelocity(*lattice,param.outlet,velocity);
 }
 
 template<class BlockLatticeT>
@@ -386,7 +386,7 @@ int main(int argc, char* argv[])
     OnLatticeBoundaryCondition3D<T,DESCRIPTOR> *bc = 
         createLocalBoundaryCondition3D<T,DESCRIPTOR>();
     outerDomainBoundaryConditions(param,lattice,bc);
-    delete bc;
+    
     
     Array<T,3> zeroVel(0.0,0.0,0.1);
     initializeAtEquilibrium(*lattice,lattice->getBoundingBox(),(T)1.0,
@@ -411,6 +411,6 @@ int main(int argc, char* argv[])
     }
     
     delete lattice;
-    
+    delete bc;
     return 0;
 }
