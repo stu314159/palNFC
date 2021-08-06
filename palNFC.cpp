@@ -214,7 +214,8 @@ void calculateDerivedSimulationParameters(SimulationParameters& param)
     param.rho_LB = 1.0;
     
     // ambient pressure scaled to LB units.
-    param.ambientPressure_LB = (1.0/param.rho)*(param.dt*param.dt/(param.dx*param.dx))*param.ambientPressure;
+    param.ambientPressure_LB = 
+        (1.0/param.rho)*(param.dt*param.dt/(param.dx*param.dx))*param.ambientPressure;
     
     T velMag = param.Re*param.nu/param.characteristicLength;
     if (param.flowDirection == 0)
@@ -242,14 +243,17 @@ void calculateDerivedSimulationParameters(SimulationParameters& param)
     param.smallEnvelopeWidth = 1; 
 }
 
-void createFluidBlocks(SimulationParameters& param, MultiBlockLattice3D<T,DESCRIPTOR>*& lattice)
+void createFluidBlocks(SimulationParameters& param, 
+    MultiBlockLattice3D<T,DESCRIPTOR>*& lattice)
 {
-    Dynamics<T,DESCRIPTOR> *dynamics = new SmagorinskyBGKdynamics<T,DESCRIPTOR>(param.omega, param.cSmago);
+    Dynamics<T,DESCRIPTOR> *dynamics = 
+        new SmagorinskyBGKdynamics<T,DESCRIPTOR>(param.omega, param.cSmago);
     
     pcout << "Dynamics: Smagorinsky BGK. " << std::endl;
     
     Box3D fullDomain(0,param.nx-1,0,param.ny-1,0,param.nz-1);
-    lattice = generateMultiBlockLattice<T,DESCRIPTOR>(fullDomain,dynamics->clone(),param.smallEnvelopeWidth).release();
+    lattice = generateMultiBlockLattice<T,DESCRIPTOR>(fullDomain,
+        dynamics->clone(),param.smallEnvelopeWidth).release();
     
     defineDynamics(*lattice, lattice->getBoundingBox(),dynamics->clone());
     delete dynamics;
@@ -259,7 +263,9 @@ void createFluidBlocks(SimulationParameters& param, MultiBlockLattice3D<T,DESCRI
 
 }
 
-void outerDomainBoundaryConditions(SimulationParameters const& param, MultiBlockLattice3D<T,DESCRIPTOR> *lattice, OnLatticeBoundaryCondition3D<T,DESCRIPTOR> *bc)
+void outerDomainBoundaryConditions(SimulationParameters const& param, 
+    MultiBlockLattice3D<T,DESCRIPTOR> *lattice, 
+    OnLatticeBoundaryCondition3D<T,DESCRIPTOR> *bc)
 {
 
     Array<T,3> velocity = getVelocity(param.inletVelocity_LB,0,param.startIter);
@@ -298,7 +304,7 @@ void outerDomainBoundaryConditions(SimulationParameters const& param, MultiBlock
         bc->addPressureBoundary2P(param.outlet,*lattice);
     }
     setBoundaryDensity(*lattice,param.outlet,param.rho_LB);
-    setBoundaryVelocity(*lattice,param.outlet,velocity);
+    //setBoundaryVelocity(*lattice,param.outlet,velocity);
 }
 
 template<class BlockLatticeT>
@@ -370,18 +376,19 @@ int main(int argc, char* argv[])
     defineDynamics(*lattice,lattice->getBoundingBox(),
         new SmagorinskyBGKdynamics<T,DESCRIPTOR>(param.omega,param.cSmago));
     
-    
-   // // create the lattice
-   // MultiBlockLattice3D<T,DESCRIPTOR> *lattice = 0;    
-   // createFluidBlocks(param, lattice);
+    // I think this defines "no dynamics" inside the surface described by the voxelized obstruction.
+    defineDynamics(*lattice,voxelizedDomain.getVoxelMatrix(),lattice->getBoundingBox(),
+        new NoDynamics<T,DESCRIPTOR>(),voxelFlag::inside);
+   
     
     // Boundary Conditions
     pcout << "Applying boundary conditions..." << std::endl;
-    OnLatticeBoundaryCondition3D<T,DESCRIPTOR> *bc = createLocalBoundaryCondition3D<T,DESCRIPTOR>();
+    OnLatticeBoundaryCondition3D<T,DESCRIPTOR> *bc = 
+        createLocalBoundaryCondition3D<T,DESCRIPTOR>();
     outerDomainBoundaryConditions(param,lattice,bc);
     delete bc;
     
-    Array<T,3> zeroVel(0.0,0.0,0.0);
+    Array<T,3> zeroVel(0.0,0.0,0.1);
     initializeAtEquilibrium(*lattice,lattice->getBoundingBox(),(T)1.0,
        zeroVel);
     
