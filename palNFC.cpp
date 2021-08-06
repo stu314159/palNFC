@@ -103,6 +103,11 @@ struct SimulationParameters
     
     plint smallEnvelopeWidth; // standard width
     
+    Box3D boundingBox() const
+    {
+        return Box3D(0,nx-1,0,ny-1,0,nz-1);
+    }
+    
 };
 
 Array<T,3> getVelocity(Array<T,3> targetValue, plint iIter, plint startIter)
@@ -341,16 +346,6 @@ int main(int argc, char* argv[])
     plint nnodes = param.nx*param.ny*param.nz;
     pcout << "Number of lattice points: " << nnodes << std::endl;
     
-    // create the lattice
-    MultiBlockLattice3D<T,DESCRIPTOR> *lattice = 0;    
-    createFluidBlocks(param, lattice);
-    
-    // Boundary Conditions
-    pcout << "Applying boundary conditions..." << std::endl;
-    OnLatticeBoundaryCondition3D<T,DESCRIPTOR> *bc = createLocalBoundaryCondition3D<T,DESCRIPTOR>();
-    outerDomainBoundaryConditions(param,lattice,bc);
-    delete bc;
-    
     // incorporate the voxelized obstruction
     pcout << std::endl << "reading STL data for the obstacle geometry." << std::endl;
     TriangleSet<T> triangleSet(param.obstFileName,DBL);
@@ -365,11 +360,33 @@ int main(int argc, char* argv[])
     plint extendedEnvelopeWidth = 2;
     const int flowType = voxelFlag::outside;
     VoxelizedDomain3D<T> voxelizedDomain(
-        boundary, flowType,lattice->getBoundingBox(),borderWidth,extendedEnvelopeWidth,blockSize);
+        boundary, flowType,param.boundingBox(),
+        borderWidth,extendedEnvelopeWidth,blockSize);
     pcout << getMultiBlockInfo(voxelizedDomain.getVoxelMatrix()) << std::endl;
     
+    pcout << "Generating the lattice." << std::endl;
+    MultiBlockLattice3D<T,DESCRIPTOR> *lattice = 
+        new MultiBlockLattice3D<T,DESCRIPTOR>(voxelizedDomain.getVoxelMatrix());
+    defineDynamics(*lattice,lattice->getBoundingBox(),
+        new SmagorinskyBGKdynamics<T,DESCRIPTOR>(param.omega,param.cSmago));
     
-    // initialize the lattice
+    
+   // // create the lattice
+   // MultiBlockLattice3D<T,DESCRIPTOR> *lattice = 0;    
+   // createFluidBlocks(param, lattice);
+    
+    // Boundary Conditions
+    pcout << "Applying boundary conditions..." << std::endl;
+    OnLatticeBoundaryCondition3D<T,DESCRIPTOR> *bc = createLocalBoundaryCondition3D<T,DESCRIPTOR>();
+    outerDomainBoundaryConditions(param,lattice,bc);
+    delete bc;
+    
+    Array<T,3> zeroVel(0.0,0.0,0.0);
+    initializeAtEquilibrium(*lattice,lattice->getBoundingBox(),(T)1.0,
+       zeroVel);
+    
+    lattice->initialize();
+    
     
     // cary out time stepping with periodic data output
     uint vtkNum = 0;
@@ -382,7 +399,7 @@ int main(int argc, char* argv[])
             writeVTK(*lattice,param,vtkNum); vtkNum++;
         }
         // execute a time iteration
-        //lattice->collideAndStream();
+        lattice->collideAndStream();
         
     }
     
